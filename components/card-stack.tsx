@@ -618,7 +618,7 @@ function Card({
   isDragging,
   totalCards,
 }: CardProps) {
-  const handleDragEnd = (_: React.MouseEvent<Element, MouseEvent> | React.TouchEvent<Element> | React.PointerEvent, info: PanInfo) => {
+  const handleDragEnd = (_: any, info: PanInfo) => {
     if (isRearranging) return
 
     const threshold = 100
@@ -642,7 +642,6 @@ function Card({
         y: isRearranging ? 0 : yOffset,
         x: isRearranging ? 0 : xOffset,
         rotateZ: isRearranging ? 0 : index * -2,
-        zIndex: isDragging ? 50 : zIndex,
       }}
       exit={{
         opacity: 0,
@@ -658,7 +657,8 @@ function Card({
       style={{
         boxShadow: `0 ${10 + index * 5}px ${30 + index * 10}px ${card.colors.shadow}`,
         backgroundColor: card.colors.primary,
-      }}
+        zIndex: isDragging ? 50 : zIndex,
+      } as any}
       className={`${
         isRearranging ? "h-64 cursor-move" : "absolute left-0 top-0 h-full w-full cursor-grab active:cursor-grabbing"
       } overflow-hidden rounded-2xl dark:border dark:border-slate-700`}
@@ -668,7 +668,6 @@ function Card({
       onDragEnd={handleDragEnd}
       whileDrag={{
         scale: 1.05,
-        boxShadow: `0 ${15 + index * 5}px ${40 + index * 10}px ${card.colors.shadow}`,
       }}
       draggable={isRearranging}
       onDragStart={isRearranging ? onDragStart : undefined}
@@ -677,7 +676,7 @@ function Card({
     >
       <motion.div
         className="relative flex h-full flex-col overflow-hidden rounded-2xl"
-        style={{ color: card.colors.text }}
+        style={{ color: card.colors.text } as any}
       >
         {/* Card Header */}
         <div className="flex items-center justify-between p-4">
@@ -757,7 +756,7 @@ function Card({
           <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 flex-col items-center">
             <motion.div
               className="h-1 w-10 rounded-full"
-              style={{ backgroundColor: `${card.colors.text}40` }}
+              style={{ backgroundColor: `${card.colors.text}40` } as any}
               animate={{ y: [0, 5, 0] }}
               transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5 }}
             />
