@@ -10,7 +10,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { CardStackProvider, useCardStack } from "./card-stack-context"
 import ColorThief from "colorthief"
 
 interface CardData {
@@ -178,6 +177,11 @@ const addNewCardTemplate: CardData = {
   },
 }
 
+// Default values for new cards
+const DEFAULT_TITLE = "NEW MEMORY"
+const DEFAULT_SUBTITLE = "Add Your Title"
+const DEFAULT_DESCRIPTION = "Add your description here..."
+
 // Helper function to extract colors from an image
 const extractColors = async (
   imageUrl: string,
@@ -229,6 +233,65 @@ const extractColors = async (
   })
 }
 
+// Add a new helper function to generate content based on image analysis
+const generateCardContent = (colors: { primary: string; secondary: string }): {
+  title: string;
+  subtitle: string;
+  description: string;
+} => {
+  // Get RGB values from the primary color
+  const primaryRgb = colors.primary.match(/\d+/g)?.map(Number) || [0, 0, 0];
+  const [r, g, b] = primaryRgb;
+  
+  // Determine the dominant color tone
+  const max = Math.max(r, g, b);
+  let colorTone = '';
+  let titlePrefix = '';
+  let subtitlePrefix = '';
+  
+  if (r === max && r > g + 30 && r > b + 30) {
+    colorTone = 'warm';
+    titlePrefix = 'SUNSET';
+    subtitlePrefix = 'Golden Moments';
+  } else if (g === max && g > r + 30 && g > b + 30) {
+    colorTone = 'natural';
+    titlePrefix = 'NATURE';
+    subtitlePrefix = 'Green Escapes';
+  } else if (b === max && b > r + 30 && b > g + 30) {
+    colorTone = 'cool';
+    titlePrefix = 'OCEAN';
+    subtitlePrefix = 'Blue Horizons';
+  } else if (r > 200 && g > 200 && b > 200) {
+    colorTone = 'bright';
+    titlePrefix = 'BRIGHT DAY';
+    subtitlePrefix = 'Sunny Memories';
+  } else if (r < 100 && g < 100 && b < 100) {
+    colorTone = 'dark';
+    titlePrefix = 'EVENING';
+    subtitlePrefix = 'Night Adventures';
+  } else {
+    colorTone = 'balanced';
+    titlePrefix = 'SPECIAL DAY';
+    subtitlePrefix = 'Precious Moments';
+  }
+  
+  // Generate descriptions based on color tone
+  const descriptions = {
+    warm: "A beautiful moment captured in warm, golden tones. This memory reminds us of the special bond we share.",
+    natural: "Surrounded by nature's beauty, this moment shows our connection to the world around us and to each other.",
+    cool: "Cool, calming colors reflect the peaceful moments we cherish together. A perfect day to remember.",
+    bright: "Bright and full of light, just like the joy we bring to each other's lives. A truly special memory.",
+    dark: "A magical evening to remember, with deep colors that remind us of our adventures together.",
+    balanced: "A perfectly balanced moment in time, capturing the essence of our relationship and shared experiences."
+  };
+  
+  return {
+    title: titlePrefix + " MEMORY",
+    subtitle: subtitlePrefix,
+    description: descriptions[colorTone as keyof typeof descriptions]
+  };
+};
+
 function CardStackContent() {
   const [cards, setCards] = useState<CardData[]>(initialCards)
   const [loading, setLoading] = useState(true)
@@ -237,9 +300,9 @@ function CardStackContent() {
   const [editedCard, setEditedCard] = useState<CardData | null>(null)
   const [showAddNewCard, setShowAddNewCard] = useState(false)
   const [newCardData, setNewCardData] = useState({
-    title: "NEW MEMORY",
-    subtitle: "Add Your Title",
-    description: "Add your description here...",
+    title: DEFAULT_TITLE,
+    subtitle: DEFAULT_SUBTITLE,
+    description: DEFAULT_DESCRIPTION,
     imageUrl: "",
     date: "",
   })
@@ -373,12 +436,30 @@ function CardStackContent() {
 
     // Extract colors from the uploaded image
     const colors = await extractColors(newCardData.imageUrl)
+    
+    // Check if the user left default values
+    const titleIsDefault = newCardData.title === DEFAULT_TITLE
+    const subtitleIsDefault = newCardData.subtitle === DEFAULT_SUBTITLE
+    const descriptionIsDefault = newCardData.description === DEFAULT_DESCRIPTION
+    
+    let finalTitle = newCardData.title
+    let finalSubtitle = newCardData.subtitle
+    let finalDescription = newCardData.description
+    
+    // If any fields are left as default, generate content based on the image
+    if (titleIsDefault || subtitleIsDefault || descriptionIsDefault) {
+      const generatedContent = generateCardContent(colors)
+      
+      if (titleIsDefault) finalTitle = generatedContent.title
+      if (subtitleIsDefault) finalSubtitle = generatedContent.subtitle
+      if (descriptionIsDefault) finalDescription = generatedContent.description
+    }
 
     const newCard: CardData = {
       id: maxId + 1,
-      title: newCardData.title,
-      subtitle: newCardData.subtitle,
-      description: newCardData.description,
+      title: finalTitle,
+      subtitle: finalSubtitle,
+      description: finalDescription,
       imageUrl: newCardData.imageUrl,
       liked: false,
       date: newCardData.date || "",
@@ -388,9 +469,9 @@ function CardStackContent() {
     setCards((prevCards) => [...prevCards, newCard])
     setShowAddNewCard(false)
     setNewCardData({
-      title: "NEW MEMORY",
-      subtitle: "Add Your Title",
-      description: "Add your description here...",
+      title: DEFAULT_TITLE,
+      subtitle: DEFAULT_SUBTITLE,
+      description: DEFAULT_DESCRIPTION,
       imageUrl: "",
       date: "",
     })
@@ -436,6 +517,18 @@ function CardStackContent() {
       )
     )
   }
+
+  // Reset to default values when canceling add new card
+  const handleCancelAddNew = () => {
+    setNewCardData({
+      title: DEFAULT_TITLE,
+      subtitle: DEFAULT_SUBTITLE,
+      description: DEFAULT_DESCRIPTION,
+      imageUrl: "",
+      date: "",
+    });
+    setShowAddNewCard(false);
+  };
 
   if (loading) {
     return <div className="flex h-96 w-full items-center justify-center">Loading cards...</div>
@@ -643,7 +736,7 @@ function CardStackContent() {
               )}
             </div>
             <div className="flex justify-between mt-4">
-              <Button variant="outline" onClick={() => setShowAddNewCard(false)}>
+              <Button variant="outline" onClick={handleCancelAddNew}>
                 <X className="mr-2 h-4 w-4" />
                 Cancel
               </Button>
@@ -760,20 +853,25 @@ function Card({
       >
         {/* Card Header */}
         <div className="flex items-center justify-between p-4">
-          <button 
-            className="rounded-full bg-opacity-20 p-2" 
-            style={{ backgroundColor: `${card.colors.text}20` }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleLike(card.id);
-            }}
-          >
-            {card.liked ? (
-              <Heart className="h-5 w-5 fill-red-500 text-red-500" />
-            ) : (
-              <Heart className="h-5 w-5" />
-            )}
-          </button>
+          {/* Only show the heart button if it's not the Add New Memory card */}
+          {!isAddNewCard && (
+            <button 
+              className="rounded-full bg-opacity-20 p-2" 
+              style={{ backgroundColor: `${card.colors.text}20` }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleLike(card.id);
+              }}
+            >
+              {card.liked ? (
+                <Heart className="h-5 w-5 fill-red-500 text-red-500" />
+              ) : (
+                <Heart className="h-5 w-5" />
+              )}
+            </button>
+          )}
+          {/* Add an empty div for spacing when the heart is not shown */}
+          {isAddNewCard && <div></div>}
           
           {!isAddNewCard && (
             <div className="flex gap-2">
@@ -868,6 +966,8 @@ function Card({
 }
 
 export default function CardStack() {
-  return <CardStackContent />
+  // Use the CardStackContent directly
+  const cardStackContent = CardStackContent()
+  return cardStackContent
 }
 
