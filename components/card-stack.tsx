@@ -366,9 +366,57 @@ function CardStackContent() {
         setCards(sortedCards)
       }
       
+      // Save cards to localStorage with a timestamp for cache busting
+      const cardsWithTimestamp = {
+        cards: cards,
+        lastUpdated: new Date().toISOString()
+      }
       localStorage.setItem('memory-cards', JSON.stringify(cards))
+      
+      // Store the last update timestamp in a separate key for cross-device sync checking
+      localStorage.setItem('memory-cards-timestamp', new Date().toISOString())
     }
   }, [cards, loading])
+
+  // Add a new effect to check for updates from other devices every minute
+  useEffect(() => {
+    // Function to check for updates
+    const checkForUpdates = () => {
+      try {
+        // Get the last update timestamp from localStorage
+        const lastUpdated = localStorage.getItem('memory-cards-timestamp')
+        
+        if (lastUpdated) {
+          // Check if it's been more than 1 minute since the last check
+          const lastCheck = localStorage.getItem('memory-cards-last-check') || '0'
+          const now = new Date().getTime()
+          
+          if (now - parseInt(lastCheck, 10) > 60000) {
+            // It's been more than a minute, force reload the page to get fresh content
+            localStorage.setItem('memory-cards-last-check', now.toString())
+            
+            // Only reload if we've been on the page for more than 2 minutes
+            // This prevents constant reloads when first opening the page
+            const pageLoadTime = localStorage.getItem('memory-cards-page-load-time')
+            if (pageLoadTime && now - parseInt(pageLoadTime, 10) > 120000) {
+              window.location.reload()
+            }
+          }
+        }
+      } catch (error) {
+        // Silently fail - this is just a background sync check
+        console.log('Update check failed, will retry later')
+      }
+    }
+    
+    // Set the page load time
+    localStorage.setItem('memory-cards-page-load-time', new Date().getTime().toString())
+    
+    // Set up interval to check every minute
+    const interval = setInterval(checkForUpdates, 60000)
+    
+    return () => clearInterval(interval)
+  }, [])
 
   const handleCardSwipe = (direction: number) => {
     if (direction < 0) {
@@ -881,7 +929,7 @@ function Card({
         style={{ color: card.colors.text } as any}
       >
         {/* Card Header - smaller padding on mobile */}
-        <div className={`flex items-center justify-between ${isMobile ? 'p-2' : 'p-4'}`}>
+        <div className={`flex items-center justify-between ${isMobile ? 'p-4' : 'p-4'}`}>
           {/* Only show the heart button if it's not the Add New Memory card */}
           {!isAddNewCard && (
             <button 
@@ -936,7 +984,7 @@ function Card({
         </div>
 
         {/* Card Title - smaller text on mobile */}
-        <div className={`${isMobile ? 'px-2 py-1' : 'px-4 py-2'}`}>
+        <div className={`${isMobile ? 'px-4 py-2' : 'px-4 py-2'}`}>
           <h2 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold`}>{card.title}</h2>
           <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-medium`} style={{ color: `${card.colors.text}99` }}>
             {card.subtitle}
@@ -944,7 +992,7 @@ function Card({
         </div>
 
         {/* Card Image */}
-        <div className={`${isMobile ? 'mt-1' : 'mt-2'} overflow-hidden ${isMobile ? 'px-2' : 'px-4'}`}>
+        <div className={`${isMobile ? 'mt-2' : 'mt-2'} overflow-hidden ${isMobile ? 'px-4' : 'px-4'}`}>
           <div
             className="aspect-video w-full overflow-hidden rounded-xl bg-cover bg-center"
             style={{
@@ -955,7 +1003,7 @@ function Card({
         </div>
 
         {/* Card Footer - smaller padding on mobile */}
-        <div className={`${isMobile ? 'mt-1 p-2' : 'mt-2 p-4'}`}>
+        <div className={`${isMobile ? 'mt-2 p-4' : 'mt-2 p-4'}`}>
           {isAddNewCard ? (
             <Button
               className="w-full"

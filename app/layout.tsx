@@ -15,6 +15,11 @@ const dancingScript = Dancing_Script({
 export const metadata: Metadata = {
   title: "Memories with Mom",
   description: "A special card stack of memories with Mom",
+  other: {
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
+  },
 }
 
 export default function RootLayout({
@@ -24,6 +29,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning className={dancingScript.variable}>
+      <head>
+        <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+        <meta httpEquiv="Pragma" content="no-cache" />
+        <meta httpEquiv="Expires" content="0" />
+        
+        <script src={`/refresh.js?v=${Date.now()}`} />
+      </head>
       <body>
         <ThemeProvider defaultTheme="system">{children}</ThemeProvider>
       </body>
