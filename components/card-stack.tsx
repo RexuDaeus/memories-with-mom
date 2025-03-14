@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
-import { motion, AnimatePresence, type PanInfo } from "framer-motion"
+import { motion, AnimatePresence, type PanInfo, useReducedMotion } from "framer-motion"
 import { Heart, Edit, Plus, Save, X, Image, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -309,6 +309,24 @@ function CardStackContent() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [cardToDelete, setCardToDelete] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Detect if we're on a mobile device based on screen width
+  const [isMobile, setIsMobile] = useState(false)
+  
+  // Update isMobile state based on window resize
+  useEffect(() => {
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    // Set initial value
+    checkIfMobile()
+    
+    // Add event listener for window resize
+    window.addEventListener('resize', checkIfMobile)
+    
+    // Clean up
+    return () => window.removeEventListener('resize', checkIfMobile)
+  }, [])
 
   // Combine regular cards with the add new card template
   const allCards = [...cards, addNewCardTemplate]
@@ -535,10 +553,10 @@ function CardStackContent() {
   }
 
   // Determine which cards to show
-  const visibleCards = allCards.slice(currentCardIndex, currentCardIndex + 3)
+  const visibleCards = allCards.slice(currentCardIndex, currentCardIndex + (isMobile ? 2 : 3))
 
   return (
-    <div className="relative h-[600px] w-full">
+    <div className={`relative ${isMobile ? 'h-[450px]' : 'h-[600px]'} w-full`}>
       {/* Card indicator dots - repositioned for better visibility */}
       <div className="absolute -bottom-28 left-1/2 z-20 flex -translate-x-1/2 gap-2">
         {allCards.map((_, index) => (
@@ -570,6 +588,7 @@ function CardStackContent() {
               onDelete={() => card.id !== 999 && handleDeleteClick(card.id)}
               isAddNewCard={card.id === 999}
               totalCards={visibleCards.length}
+              isMobile={isMobile}
             />
           ))}
         </AnimatePresence>
@@ -786,6 +805,7 @@ interface CardProps {
   onDelete: () => void
   isAddNewCard: boolean
   totalCards: number
+  isMobile: boolean
 }
 
 function Card({
@@ -798,9 +818,13 @@ function Card({
   onDelete,
   isAddNewCard,
   totalCards,
+  isMobile,
 }: CardProps) {
+  // Use reduced motion if the user prefers it in their system settings
+  const prefersReducedMotion = useReducedMotion()
+  
   const handleDragEnd = (_: any, info: PanInfo) => {
-    const threshold = 100
+    const threshold = isMobile ? 50 : 100
     if (Math.abs(info.offset.x) > threshold) {
       onSwipe(info.offset.x)
     }
@@ -808,8 +832,10 @@ function Card({
 
   // Calculate z-index and offsets for stacked appearance
   const zIndex = totalCards - index
-  const yOffset = index * 30
-  const xOffset = index * 5
+  const yOffset = isMobile ? index * 15 : index * 30
+  const xOffset = isMobile ? index * 2 : index * 5
+  // Reduced rotation on mobile for better performance
+  const rotateZ = isMobile ? index * -1 : index * -2
 
   return (
     <motion.div
@@ -820,7 +846,7 @@ function Card({
         scale: 1,
         y: yOffset,
         x: xOffset,
-        rotateZ: index * -2,
+        rotateZ: prefersReducedMotion ? 0 : rotateZ,
       }}
       exit={{
         opacity: 0,
@@ -828,35 +854,38 @@ function Card({
         transition: { duration: 0.2 },
       }}
       transition={{
-        type: "spring",
-        stiffness: 500,
-        damping: 50,
-        mass: 1,
+        // Optimize transitions for mobile
+        type: prefersReducedMotion ? "tween" : "spring",
+        stiffness: isMobile ? 300 : 500,
+        damping: isMobile ? 30 : 50,
+        mass: isMobile ? 0.8 : 1,
       }}
       style={{
-        boxShadow: `0 ${10 + index * 5}px ${30 + index * 10}px ${card.colors.shadow}`,
+        boxShadow: `0 ${isMobile ? 5 + index * 3 : 10 + index * 5}px ${isMobile ? 15 + index * 5 : 30 + index * 10}px ${card.colors.shadow}`,
         backgroundColor: card.colors.primary,
         zIndex,
+        // Add will-change to optimize rendering
+        willChange: 'transform',
       } as any}
-      className="absolute left-0 top-0 h-full w-full cursor-grab active:cursor-grabbing overflow-hidden rounded-2xl dark:border dark:border-slate-700"
-      drag
+      className={`absolute left-0 top-0 h-full w-full cursor-grab active:cursor-grabbing overflow-hidden rounded-2xl dark:border dark:border-slate-700`}
+      drag={!prefersReducedMotion} // Disable drag if user prefers reduced motion
       dragConstraints={{ top: 0, bottom: 0, left: 0, right: 0 }}
-      dragElastic={0.6}
+      dragElastic={isMobile ? 0.4 : 0.6} // Reduce elasticity on mobile
       onDragEnd={handleDragEnd}
       whileDrag={{
-        scale: 1.05,
+        scale: isMobile ? 1.02 : 1.05, // Smaller scale change on mobile
       }}
     >
       <motion.div
         className="relative flex h-full flex-col overflow-hidden rounded-2xl"
         style={{ color: card.colors.text } as any}
       >
-        {/* Card Header */}
-        <div className="flex items-center justify-between p-4">
+        {/* Card Header - smaller padding on mobile */}
+        <div className={`flex items-center justify-between ${isMobile ? 'p-2' : 'p-4'}`}>
           {/* Only show the heart button if it's not the Add New Memory card */}
           {!isAddNewCard && (
             <button 
-              className="rounded-full bg-opacity-20 p-2" 
+              className={`rounded-full bg-opacity-20 ${isMobile ? 'p-1.5' : 'p-2'}`}
               style={{ backgroundColor: `${card.colors.text}20` }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -864,9 +893,9 @@ function Card({
               }}
             >
               {card.liked ? (
-                <Heart className="h-5 w-5 fill-red-500 text-red-500" />
+                <Heart className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'} fill-red-500 text-red-500`} />
               ) : (
-                <Heart className="h-5 w-5" />
+                <Heart className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
               )}
             </button>
           )}
@@ -877,7 +906,7 @@ function Card({
             <div className="flex gap-2">
               <Button
                 variant="ghost"
-                size="icon"
+                size={isMobile ? "sm" : "icon"}
                 className="rounded-full bg-opacity-20 hover:bg-opacity-30"
                 style={{ backgroundColor: `${card.colors.text}20` }}
                 onClick={(e) => {
@@ -885,13 +914,13 @@ function Card({
                   onEdit()
                 }}
               >
-                <Edit className="h-4 w-4" style={{ color: card.colors.text }} />
+                <Edit className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} style={{ color: card.colors.text }} />
                 <span className="sr-only">Edit</span>
               </Button>
               
               <Button
                 variant="ghost"
-                size="icon"
+                size={isMobile ? "sm" : "icon"}
                 className="rounded-full bg-opacity-20 hover:bg-opacity-30"
                 style={{ backgroundColor: `${card.colors.text}20` }}
                 onClick={(e) => {
@@ -899,49 +928,50 @@ function Card({
                   onDelete()
                 }}
               >
-                <Trash2 className="h-4 w-4" style={{ color: card.colors.text }} />
+                <Trash2 className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} style={{ color: card.colors.text }} />
                 <span className="sr-only">Delete</span>
               </Button>
             </div>
           )}
         </div>
 
-        {/* Card Title */}
-        <div className="px-4 py-2">
-          <h2 className="text-3xl font-bold">{card.title}</h2>
-          <h3 className="text-xl font-medium" style={{ color: `${card.colors.text}99` }}>
+        {/* Card Title - smaller text on mobile */}
+        <div className={`${isMobile ? 'px-2 py-1' : 'px-4 py-2'}`}>
+          <h2 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold`}>{card.title}</h2>
+          <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-medium`} style={{ color: `${card.colors.text}99` }}>
             {card.subtitle}
           </h3>
         </div>
 
         {/* Card Image */}
-        <div className="mt-2 overflow-hidden px-4">
+        <div className={`${isMobile ? 'mt-1' : 'mt-2'} overflow-hidden ${isMobile ? 'px-2' : 'px-4'}`}>
           <div
             className="aspect-video w-full overflow-hidden rounded-xl bg-cover bg-center"
             style={{
               backgroundImage: `url(${card.imageUrl})`,
-              boxShadow: `0 10px 30px ${card.colors.shadow}`,
+              boxShadow: `0 ${isMobile ? '5px 15px' : '10px 30px'} ${card.colors.shadow}`,
             }}
           />
         </div>
 
-        {/* Card Footer - moved up closer to the photo */}
-        <div className="mt-2 p-4">
+        {/* Card Footer - smaller padding on mobile */}
+        <div className={`${isMobile ? 'mt-1 p-2' : 'mt-2 p-4'}`}>
           {isAddNewCard ? (
             <Button
               className="w-full"
+              size={isMobile ? "sm" : "default"}
               onClick={(e) => {
                 e.stopPropagation()
                 onAddNew()
               }}
             >
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className={`mr-2 ${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
               Add New Memory
             </Button>
           ) : (
             <>
               <div
-                className="rounded-full px-3 py-1 text-sm"
+                className={`rounded-full ${isMobile ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'}`}
                 style={{
                   backgroundColor: `${card.colors.text}20`,
                   display: "inline-flex",
@@ -950,13 +980,13 @@ function Card({
                 }}
               >
                 {card.liked ? (
-                  <Heart className="h-4 w-4 fill-red-500 text-red-500" />
+                  <Heart className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'} fill-red-500 text-red-500`} />
                 ) : (
-                  <Heart className="h-4 w-4" />
+                  <Heart className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
                 )}
                 {card.date || "No date"}
               </div>
-              <p className="mt-2 text-sm opacity-80">{card.description}</p>
+              <p className={`${isMobile ? 'mt-1 text-xs leading-tight' : 'mt-2 text-sm'} opacity-80`}>{card.description}</p>
             </>
           )}
         </div>
