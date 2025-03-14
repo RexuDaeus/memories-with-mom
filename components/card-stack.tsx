@@ -18,6 +18,11 @@ import {
   subscribeToCardChanges,
   type CardData as FirebaseCardData
 } from "@/lib/firebase"
+import {
+  saveCardsToLocalStorage,
+  loadCardsFromLocalStorage,
+  hasNewerCardsInLocalStorage
+} from "@/lib/local-storage"
 
 interface CardData {
   id: number
@@ -322,6 +327,9 @@ function CardStackContent() {
   // Get Firebase auth data
   const { userId, isAuthenticated, isLoading: authLoading } = useFirebase()
   
+  const [isUsingFirebase, setIsUsingFirebase] = useState(true)
+  const [firebaseError, setFirebaseError] = useState<string | null>(null)
+  
   // Update isMobile state based on window resize
   useEffect(() => {
     const checkIfMobile = () => {
@@ -343,46 +351,65 @@ function CardStackContent() {
 
   // Function to update Firestore when cards change
   const saveCardsToCloud = async (cardsToSave: CardData[]) => {
-    if (userId) {
+    // Always save to localStorage as a backup
+    saveCardsToLocalStorage(cardsToSave);
+    
+    if (userId && isUsingFirebase) {
       try {
         await saveCardsToFirestore(cardsToSave);
+        setFirebaseError(null);
       } catch (error) {
         console.error("Error saving cards to Firestore:", error);
+        setFirebaseError(`Failed to save to Firebase: ${error}`);
+        setIsUsingFirebase(false);
       }
     }
   };
 
-  // Load cards from Firestore on component mount
+  // Load cards on component mount
   useEffect(() => {
     const fetchCards = async () => {
-      if (!userId || authLoading) return;
-      
       setLoading(true);
       
       try {
-        // Try to load from Firestore first
-        const loadedCards = await loadCardsFromFirestore();
+        let loadedCards: CardData[] = [];
         
+        // If we have a user ID and Firebase is available, try loading from there first
+        if (userId && isUsingFirebase) {
+          try {
+            loadedCards = await loadCardsFromFirestore();
+            console.log('Successfully loaded cards from Firebase:', loadedCards.length);
+            
+            if (hasNewerCardsInLocalStorage()) {
+              // If local cards are newer (offline edits), prefer those
+              const localCards = loadCardsFromLocalStorage();
+              if (localCards.length > 0) {
+                console.log('Found newer cards in localStorage, using those instead');
+                loadedCards = localCards;
+                // Save these back to Firebase
+                saveCardsToFirestore(localCards).catch(console.error);
+              }
+            }
+          } catch (error) {
+            console.error('Error loading from Firebase, falling back to localStorage:', error);
+            setFirebaseError(`Failed to load from Firebase: ${error}`);
+            setIsUsingFirebase(false);
+            
+            // Fall back to localStorage
+            loadedCards = loadCardsFromLocalStorage();
+          }
+        } else {
+          // Just use localStorage
+          loadedCards = loadCardsFromLocalStorage();
+        }
+        
+        // If we got cards, use them
         if (loadedCards && loadedCards.length > 0) {
           setCards(loadedCards);
         } else {
-          // If no cards in Firestore, try localStorage as a fallback
-          const savedCards = localStorage.getItem('memory-cards');
-          
-          if (savedCards) {
-            try {
-              const parsedCards = JSON.parse(savedCards) as CardData[];
-              setCards(parsedCards);
-              
-              // Save these cards to Firestore for future synchronization
-              saveCardsToCloud(parsedCards);
-            } catch (error) {
-              console.error('Failed to parse saved cards:', error);
-            }
-          } else {
-            // If no cards in localStorage either, use initial cards
-            saveCardsToCloud(initialCards);
-          }
+          // Use initial cards as a last resort
+          console.log('No cards found, using initial cards');
+          saveCardsToCloud(initialCards);
         }
       } catch (error) {
         console.error('Error loading cards:', error);
@@ -397,28 +424,37 @@ function CardStackContent() {
     };
     
     fetchCards();
-  }, [userId, authLoading]);
+  }, [userId, authLoading, isUsingFirebase]);
 
   // Set up real-time subscription to card changes
   useEffect(() => {
-    if (!userId || !isAuthenticated) return;
+    if (!userId || !isAuthenticated || !isUsingFirebase) return;
     
-    // Subscribe to real-time updates
-    const unsubscribe = subscribeToCardChanges(userId, (updatedCards) => {
-      // Update local state with the latest cards from Firestore
-      setCards(updatedCards);
-    });
-    
-    return () => {
-      // Clean up subscription when component unmounts
-      unsubscribe();
-    };
-  }, [userId, isAuthenticated]);
+    try {
+      // Subscribe to real-time updates
+      const unsubscribe = subscribeToCardChanges(userId, (updatedCards) => {
+        // Update local state with the latest cards from Firestore
+        console.log('Received real-time update from Firebase:', updatedCards.length);
+        setCards(updatedCards);
+        setFirebaseError(null);
+      });
+      
+      return () => {
+        // Clean up subscription when component unmounts
+        unsubscribe();
+      };
+    } catch (error) {
+      console.error('Error setting up Firebase subscription:', error);
+      setFirebaseError(`Failed to subscribe to Firebase updates: ${error}`);
+      setIsUsingFirebase(false);
+      return () => {}; // Return empty cleanup function
+    }
+  }, [userId, isAuthenticated, isUsingFirebase]);
 
-  // Save cards to Firestore whenever they change
+  // Save cards whenever they change
   useEffect(() => {
     // Skip initial load
-    if (loading || authLoading || !userId) return;
+    if (loading || authLoading) return;
     
     // Sort cards by date (oldest first)
     const sortedCards = [...cards].sort((a, b) => {
@@ -432,12 +468,13 @@ function CardStackContent() {
     // Only update if the order has changed
     if (JSON.stringify(sortedCards.map(c => c.id)) !== JSON.stringify(cards.map(c => c.id))) {
       setCards(sortedCards);
+      return; // Skip saving as this will trigger another useEffect run with the sorted cards
     }
     
-    // Save to Firestore
+    // Save to storage
     saveCardsToCloud(cards);
     
-  }, [cards, loading, authLoading, userId]);
+  }, [cards, loading, authLoading, userId, isUsingFirebase]);
 
   const handleCardSwipe = (direction: number) => {
     if (direction < 0) {
@@ -629,6 +666,15 @@ function CardStackContent() {
             <div className="h-8 w-8 rounded-full border-4 border-primary/30 border-t-primary animate-spin"></div>
             <p className="text-sm text-muted-foreground">Loading your memories...</p>
           </div>
+        </div>
+      )}
+      
+      {/* Firebase error indicator */}
+      {firebaseError && (
+        <div className="absolute top-0 right-0 m-4 p-4 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-100 rounded-lg max-w-xs z-50">
+          <p className="text-sm font-semibold mb-1">Firebase Error:</p>
+          <p className="text-xs">{firebaseError}</p>
+          <p className="text-xs mt-2">Your cards are being saved locally only.</p>
         </div>
       )}
 

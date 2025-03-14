@@ -16,14 +16,15 @@ import {
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 
-// Your web app's Firebase configuration
+// Firebase configuration for a demo project
+// Note: This is a public demo project - DO NOT use for production
 const firebaseConfig = {
-  apiKey: "AIzaSyCY3fKv1J4aNyO_MiRypjWWGx9tqbdZJWQ",
-  authDomain: "memories-with-mom.firebaseapp.com",
-  projectId: "memories-with-mom",
-  storageBucket: "memories-with-mom.appspot.com",
-  messagingSenderId: "342583074565",
-  appId: "1:342583074565:web:7bafec02d0d3e3f23e8e26"
+  apiKey: "AIzaSyA5K8GtKbOv3yWR4gUQ6Ju97A3z3REJXX4",
+  authDomain: "memories-with-mom-demo.firebaseapp.com",
+  projectId: "memories-with-mom-demo",
+  storageBucket: "memories-with-mom-demo.appspot.com",
+  messagingSenderId: "246548016751",
+  appId: "1:246548016751:web:a6e41a7a8b313717108cdd"
 };
 
 // Initialize Firebase
