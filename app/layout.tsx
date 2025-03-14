@@ -1,5 +1,6 @@
 import type React from "react"
 import { ThemeProvider } from "@/components/theme-provider"
+import { FirebaseProvider } from "@/components/firebase-provider"
 import "./globals.css"
 import type { Metadata } from "next"
 import { Dancing_Script } from "next/font/google"
@@ -37,7 +38,9 @@ export default function RootLayout({
         <script src={`/refresh.js?v=${Date.now()}`} />
       </head>
       <body>
-        <ThemeProvider defaultTheme="system">{children}</ThemeProvider>
+        <FirebaseProvider>
+          <ThemeProvider defaultTheme="system">{children}</ThemeProvider>
+        </FirebaseProvider>
       </body>
     </html>
   )

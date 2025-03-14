@@ -11,6 +11,13 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import ColorThief from "colorthief"
+import { useFirebase } from "@/components/firebase-provider"
+import { 
+  loadCardsFromFirestore, 
+  saveCardsToFirestore, 
+  subscribeToCardChanges,
+  type CardData as FirebaseCardData
+} from "@/lib/firebase"
 
 interface CardData {
   id: number
@@ -312,6 +319,9 @@ function CardStackContent() {
   // Detect if we're on a mobile device based on screen width
   const [isMobile, setIsMobile] = useState(false)
   
+  // Get Firebase auth data
+  const { userId, isAuthenticated, isLoading: authLoading } = useFirebase()
+  
   // Update isMobile state based on window resize
   useEffect(() => {
     const checkIfMobile = () => {
@@ -331,92 +341,103 @@ function CardStackContent() {
   // Combine regular cards with the add new card template
   const allCards = [...cards, addNewCardTemplate]
 
-  // Load cards from localStorage on component mount
-  useEffect(() => {
-    const savedCards = localStorage.getItem('memory-cards')
-    if (savedCards) {
+  // Function to update Firestore when cards change
+  const saveCardsToCloud = async (cardsToSave: CardData[]) => {
+    if (userId) {
       try {
-        const parsedCards = JSON.parse(savedCards)
-        setCards(parsedCards)
+        await saveCardsToFirestore(cardsToSave);
       } catch (error) {
-        console.error('Failed to parse saved cards:', error)
+        console.error("Error saving cards to Firestore:", error);
       }
     }
-    // Set loading to false after a short delay to ensure smooth animation
-    const timer = setTimeout(() => {
-      setLoading(false)
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [])
+  };
 
-  // Sort cards by date and save to localStorage whenever they change
+  // Load cards from Firestore on component mount
   useEffect(() => {
-    if (!loading) {
-      // Sort cards by date (oldest first)
-      const sortedCards = [...cards].sort((a, b) => {
-        // Cards without dates go to the end
-        if (!a.date && !b.date) return 0
-        if (!a.date) return 1
-        if (!b.date) return -1
-        return new Date(a.date).getTime() - new Date(b.date).getTime()
-      })
+    const fetchCards = async () => {
+      if (!userId || authLoading) return;
       
-      // Only update if the order has changed
-      if (JSON.stringify(sortedCards.map(c => c.id)) !== JSON.stringify(cards.map(c => c.id))) {
-        setCards(sortedCards)
-      }
+      setLoading(true);
       
-      // Save cards to localStorage with a timestamp for cache busting
-      const cardsWithTimestamp = {
-        cards: cards,
-        lastUpdated: new Date().toISOString()
-      }
-      localStorage.setItem('memory-cards', JSON.stringify(cards))
-      
-      // Store the last update timestamp in a separate key for cross-device sync checking
-      localStorage.setItem('memory-cards-timestamp', new Date().toISOString())
-    }
-  }, [cards, loading])
-
-  // Add a new effect to check for updates from other devices every minute
-  useEffect(() => {
-    // Function to check for updates
-    const checkForUpdates = () => {
       try {
-        // Get the last update timestamp from localStorage
-        const lastUpdated = localStorage.getItem('memory-cards-timestamp')
+        // Try to load from Firestore first
+        const loadedCards = await loadCardsFromFirestore();
         
-        if (lastUpdated) {
-          // Check if it's been more than 1 minute since the last check
-          const lastCheck = localStorage.getItem('memory-cards-last-check') || '0'
-          const now = new Date().getTime()
+        if (loadedCards && loadedCards.length > 0) {
+          setCards(loadedCards);
+        } else {
+          // If no cards in Firestore, try localStorage as a fallback
+          const savedCards = localStorage.getItem('memory-cards');
           
-          if (now - parseInt(lastCheck, 10) > 60000) {
-            // It's been more than a minute, force reload the page to get fresh content
-            localStorage.setItem('memory-cards-last-check', now.toString())
-            
-            // Only reload if we've been on the page for more than 2 minutes
-            // This prevents constant reloads when first opening the page
-            const pageLoadTime = localStorage.getItem('memory-cards-page-load-time')
-            if (pageLoadTime && now - parseInt(pageLoadTime, 10) > 120000) {
-              window.location.reload()
+          if (savedCards) {
+            try {
+              const parsedCards = JSON.parse(savedCards) as CardData[];
+              setCards(parsedCards);
+              
+              // Save these cards to Firestore for future synchronization
+              saveCardsToCloud(parsedCards);
+            } catch (error) {
+              console.error('Failed to parse saved cards:', error);
             }
+          } else {
+            // If no cards in localStorage either, use initial cards
+            saveCardsToCloud(initialCards);
           }
         }
       } catch (error) {
-        // Silently fail - this is just a background sync check
-        console.log('Update check failed, will retry later')
+        console.error('Error loading cards:', error);
+      } finally {
+        // Set loading to false after a short delay to ensure smooth animation
+        const timer = setTimeout(() => {
+          setLoading(false);
+        }, 500);
+        
+        return () => clearTimeout(timer);
       }
+    };
+    
+    fetchCards();
+  }, [userId, authLoading]);
+
+  // Set up real-time subscription to card changes
+  useEffect(() => {
+    if (!userId || !isAuthenticated) return;
+    
+    // Subscribe to real-time updates
+    const unsubscribe = subscribeToCardChanges(userId, (updatedCards) => {
+      // Update local state with the latest cards from Firestore
+      setCards(updatedCards);
+    });
+    
+    return () => {
+      // Clean up subscription when component unmounts
+      unsubscribe();
+    };
+  }, [userId, isAuthenticated]);
+
+  // Save cards to Firestore whenever they change
+  useEffect(() => {
+    // Skip initial load
+    if (loading || authLoading || !userId) return;
+    
+    // Sort cards by date (oldest first)
+    const sortedCards = [...cards].sort((a, b) => {
+      // Cards without dates go to the end
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+    
+    // Only update if the order has changed
+    if (JSON.stringify(sortedCards.map(c => c.id)) !== JSON.stringify(cards.map(c => c.id))) {
+      setCards(sortedCards);
     }
     
-    // Set the page load time
-    localStorage.setItem('memory-cards-page-load-time', new Date().getTime().toString())
+    // Save to Firestore
+    saveCardsToCloud(cards);
     
-    // Set up interval to check every minute
-    const interval = setInterval(checkForUpdates, 60000)
-    
-    return () => clearInterval(interval)
-  }, [])
+  }, [cards, loading, authLoading, userId]);
 
   const handleCardSwipe = (direction: number) => {
     if (direction < 0) {
@@ -596,15 +617,21 @@ function CardStackContent() {
     setShowAddNewCard(false);
   };
 
-  if (loading) {
-    return <div className="flex h-96 w-full items-center justify-center">Loading cards...</div>
-  }
-
   // Determine which cards to show
   const visibleCards = allCards.slice(currentCardIndex, currentCardIndex + (isMobile ? 2 : 3))
 
   return (
     <div className={`relative ${isMobile ? 'h-[450px]' : 'h-[600px]'} w-full`}>
+      {/* Loading indicator */}
+      {(loading || authLoading) && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-50">
+          <div className="flex flex-col items-center gap-2">
+            <div className="h-8 w-8 rounded-full border-4 border-primary/30 border-t-primary animate-spin"></div>
+            <p className="text-sm text-muted-foreground">Loading your memories...</p>
+          </div>
+        </div>
+      )}
+
       {/* Card indicator dots - repositioned for better visibility */}
       <div className="absolute -bottom-28 left-1/2 z-20 flex -translate-x-1/2 gap-2">
         {allCards.map((_, index) => (
