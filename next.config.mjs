@@ -11,6 +11,11 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   output: 'export',
+  images: {
+    unoptimized: true,
+  },
+  // Add trailing slashes to improve compatibility with static hosting
+  trailingSlash: true,
 };
 
 export default nextConfig;
