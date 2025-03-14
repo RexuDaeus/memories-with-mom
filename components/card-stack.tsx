@@ -229,13 +229,30 @@ function CardStackContent() {
   // Combine regular cards with the add new card template
   const allCards = [...cards, addNewCardTemplate]
 
+  // Load cards from localStorage on component mount
   useEffect(() => {
+    const savedCards = localStorage.getItem('memory-cards')
+    if (savedCards) {
+      try {
+        const parsedCards = JSON.parse(savedCards)
+        setCards(parsedCards)
+      } catch (error) {
+        console.error('Failed to parse saved cards:', error)
+      }
+    }
     // Set loading to false after a short delay to ensure smooth animation
     const timer = setTimeout(() => {
       setLoading(false)
     }, 500)
     return () => clearTimeout(timer)
   }, [])
+
+  // Save cards to localStorage whenever they change
+  useEffect(() => {
+    if (!loading) {
+      localStorage.setItem('memory-cards', JSON.stringify(cards))
+    }
+  }, [cards, loading])
 
   const handleCardSwipe = (direction: number) => {
     if (direction < 0) {
@@ -387,7 +404,7 @@ function CardStackContent() {
   return (
     <div className="relative h-[600px] w-full">
       {/* Card indicator dots - repositioned for better visibility */}
-      <div className="absolute -bottom-20 left-1/2 z-20 flex -translate-x-1/2 gap-2">
+      <div className="absolute -bottom-28 left-1/2 z-20 flex -translate-x-1/2 gap-2">
         {allCards.map((_, index) => (
           <button
             key={index}
