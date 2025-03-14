@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence, type PanInfo } from "framer-motion"
-import { Heart, Edit, Plus, Save, X, Image } from "lucide-react"
+import { Heart, Edit, Plus, Save, X, Image, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -243,9 +243,9 @@ function CardStackContent() {
     imageUrl: "",
     date: "",
   })
-  const [draggedCardIndex, setDraggedCardIndex] = useState<number | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [cardToDelete, setCardToDelete] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { isRearranging } = useCardStack()
 
   // Combine regular cards with the add new card template
   const allCards = [...cards, addNewCardTemplate]
@@ -268,9 +268,23 @@ function CardStackContent() {
     return () => clearTimeout(timer)
   }, [])
 
-  // Save cards to localStorage whenever they change
+  // Sort cards by date and save to localStorage whenever they change
   useEffect(() => {
     if (!loading) {
+      // Sort cards by date (oldest first)
+      const sortedCards = [...cards].sort((a, b) => {
+        // Cards without dates go to the end
+        if (!a.date && !b.date) return 0
+        if (!a.date) return 1
+        if (!b.date) return -1
+        return new Date(a.date).getTime() - new Date(b.date).getTime()
+      })
+      
+      // Only update if the order has changed
+      if (JSON.stringify(sortedCards.map(c => c.id)) !== JSON.stringify(cards.map(c => c.id))) {
+        setCards(sortedCards)
+      }
+      
       localStorage.setItem('memory-cards', JSON.stringify(cards))
     }
   }, [cards, loading])
@@ -325,6 +339,31 @@ function CardStackContent() {
   const handleCancelEdit = () => {
     setIsEditing(false)
     setEditedCard(null)
+  }
+
+  // Add delete card functionality
+  const handleDeleteClick = (cardId: number) => {
+    setCardToDelete(cardId)
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDeleteCard = () => {
+    if (cardToDelete === null) return
+    
+    setCards((prevCards) => prevCards.filter((card) => card.id !== cardToDelete))
+    
+    // If we're deleting the current card, adjust the current index
+    if (currentCardIndex >= cards.length - 1) {
+      setCurrentCardIndex(Math.max(0, cards.length - 2))
+    }
+    
+    setShowDeleteConfirm(false)
+    setCardToDelete(null)
+  }
+
+  const cancelDeleteCard = () => {
+    setShowDeleteConfirm(false)
+    setCardToDelete(null)
   }
 
   const handleAddNewCard = async () => {
@@ -389,35 +428,7 @@ function CardStackContent() {
     }
   }
 
-  const handleDragStart = (index: number) => {
-    setDraggedCardIndex(index)
-  }
-
-  const handleDragOver = (index: number) => {
-    if (draggedCardIndex === null || draggedCardIndex === index) return
-
-    // Reorder the cards
-    setCards((prevCards) => {
-      const newCards = [...prevCards]
-      const [draggedCard] = newCards.splice(draggedCardIndex, 1)
-      newCards.splice(index, 0, draggedCard)
-      return newCards
-    })
-
-    // Update the current index if needed
-    if (currentCardIndex === draggedCardIndex) {
-      setCurrentCardIndex(index)
-    } else if (currentCardIndex === index) {
-      setCurrentCardIndex(draggedCardIndex > index ? index + 1 : index - 1)
-    }
-
-    setDraggedCardIndex(index)
-  }
-
-  const handleDragEnd = () => {
-    setDraggedCardIndex(null)
-  }
-
+  // Toggle like status for a card
   const toggleLike = (cardId: number) => {
     setCards(prevCards => 
       prevCards.map(card => 
@@ -431,7 +442,7 @@ function CardStackContent() {
   }
 
   // Determine which cards to show
-  const visibleCards = isRearranging ? cards : allCards.slice(currentCardIndex, currentCardIndex + 3)
+  const visibleCards = allCards.slice(currentCardIndex, currentCardIndex + 3)
 
   return (
     <div className="relative h-[600px] w-full">
@@ -452,25 +463,19 @@ function CardStackContent() {
       </div>
 
       {/* Cards */}
-      <div
-        className={`relative h-full w-full ${isRearranging ? "grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 overflow-auto pb-8" : ""}`}
-      >
+      <div className="relative h-full w-full">
         <AnimatePresence mode="popLayout">
           {visibleCards.map((card, index) => (
             <Card
               key={card.id}
               card={card}
-              index={isRearranging ? 0 : index}
+              index={index}
               onSwipe={handleCardSwipe}
               onEdit={() => card.id !== 999 && handleEditClick(card)}
               onAddNew={handleAddNewCardClick}
               onToggleLike={toggleLike}
+              onDelete={() => card.id !== 999 && handleDeleteClick(card.id)}
               isAddNewCard={card.id === 999}
-              isRearranging={isRearranging}
-              onDragStart={() => handleDragStart(index)}
-              onDragOver={() => handleDragOver(index)}
-              onDragEnd={handleDragEnd}
-              isDragging={draggedCardIndex === index}
               totalCards={visibleCards.length}
             />
           ))}
@@ -650,6 +655,30 @@ function CardStackContent() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Card</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-center text-slate-700 dark:text-slate-300">
+              Are you sure you want to delete this memory card? This action cannot be undone.
+            </p>
+            <div className="mt-6 flex justify-between">
+              <Button variant="outline" onClick={cancelDeleteCard}>
+                <X className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmDeleteCard}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Card
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -661,12 +690,8 @@ interface CardProps {
   onEdit: () => void
   onAddNew: () => void
   onToggleLike: (cardId: number) => void
+  onDelete: () => void
   isAddNewCard: boolean
-  isRearranging: boolean
-  onDragStart: () => void
-  onDragOver: () => void
-  onDragEnd: () => void
-  isDragging: boolean
   totalCards: number
 }
 
@@ -677,17 +702,11 @@ function Card({
   onEdit,
   onAddNew,
   onToggleLike,
+  onDelete,
   isAddNewCard,
-  isRearranging,
-  onDragStart,
-  onDragOver,
-  onDragEnd,
-  isDragging,
   totalCards,
 }: CardProps) {
   const handleDragEnd = (_: any, info: PanInfo) => {
-    if (isRearranging) return
-
     const threshold = 100
     if (Math.abs(info.offset.x) > threshold) {
       onSwipe(info.offset.x)
@@ -705,10 +724,10 @@ function Card({
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{
         opacity: 1,
-        scale: isRearranging ? 0.9 : 1,
-        y: isRearranging ? 0 : yOffset,
-        x: isRearranging ? 0 : xOffset,
-        rotateZ: isRearranging ? 0 : index * -2,
+        scale: 1,
+        y: yOffset,
+        x: xOffset,
+        rotateZ: index * -2,
       }}
       exit={{
         opacity: 0,
@@ -724,51 +743,40 @@ function Card({
       style={{
         boxShadow: `0 ${10 + index * 5}px ${30 + index * 10}px ${card.colors.shadow}`,
         backgroundColor: card.colors.primary,
-        zIndex: isDragging ? 50 : zIndex,
+        zIndex,
       } as any}
-      className={`${
-        isRearranging ? "h-64 cursor-move" : "absolute left-0 top-0 h-full w-full cursor-grab active:cursor-grabbing"
-      } overflow-hidden rounded-2xl dark:border dark:border-slate-700`}
-      drag={!isRearranging}
+      className="absolute left-0 top-0 h-full w-full cursor-grab active:cursor-grabbing overflow-hidden rounded-2xl dark:border dark:border-slate-700"
+      drag
       dragConstraints={{ top: 0, bottom: 0, left: 0, right: 0 }}
       dragElastic={0.6}
       onDragEnd={handleDragEnd}
       whileDrag={{
         scale: 1.05,
       }}
-      draggable={isRearranging}
-      onDragStart={isRearranging ? onDragStart : undefined}
-      onDragOver={isRearranging ? onDragOver : undefined}
-      onDragEndCapture={isRearranging ? onDragEnd : undefined}
     >
-      {isRearranging ? (
-        // In rearrange mode, only show the photo
-        <div 
-          className="w-full h-full bg-cover bg-center rounded-2xl"
-          style={{ backgroundImage: `url(${card.imageUrl})` }}
-        />
-      ) : (
-        <motion.div
-          className="relative flex h-full flex-col overflow-hidden rounded-2xl"
-          style={{ color: card.colors.text } as any}
-        >
-          {/* Card Header */}
-          <div className="flex items-center justify-between p-4">
-            <button 
-              className="rounded-full bg-opacity-20 p-2" 
-              style={{ backgroundColor: `${card.colors.text}20` }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleLike(card.id);
-              }}
-            >
-              {card.liked ? (
-                <Heart className="h-5 w-5 fill-red-500 text-red-500" />
-              ) : (
-                <Heart className="h-5 w-5" />
-              )}
-            </button>
-            {!isAddNewCard && (
+      <motion.div
+        className="relative flex h-full flex-col overflow-hidden rounded-2xl"
+        style={{ color: card.colors.text } as any}
+      >
+        {/* Card Header */}
+        <div className="flex items-center justify-between p-4">
+          <button 
+            className="rounded-full bg-opacity-20 p-2" 
+            style={{ backgroundColor: `${card.colors.text}20` }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleLike(card.id);
+            }}
+          >
+            {card.liked ? (
+              <Heart className="h-5 w-5 fill-red-500 text-red-500" />
+            ) : (
+              <Heart className="h-5 w-5" />
+            )}
+          </button>
+          
+          {!isAddNewCard && (
+            <div className="flex gap-2">
               <Button
                 variant="ghost"
                 size="icon"
@@ -782,86 +790,84 @@ function Card({
                 <Edit className="h-4 w-4" style={{ color: card.colors.text }} />
                 <span className="sr-only">Edit</span>
               </Button>
-            )}
-          </div>
-
-          {/* Card Title */}
-          <div className="px-4 py-2">
-            <h2 className="text-3xl font-bold">{card.title}</h2>
-            <h3 className="text-xl font-medium" style={{ color: `${card.colors.text}99` }}>
-              {card.subtitle}
-            </h3>
-          </div>
-
-          {/* Card Image */}
-          <div className="mt-2 overflow-hidden px-4">
-            <div
-              className="aspect-video w-full overflow-hidden rounded-xl bg-cover bg-center"
-              style={{
-                backgroundImage: `url(${card.imageUrl})`,
-                boxShadow: `0 10px 30px ${card.colors.shadow}`,
-              }}
-            />
-          </div>
-
-          {/* Card Footer - moved up closer to the photo */}
-          <div className="mt-2 p-4">
-            {isAddNewCard ? (
+              
               <Button
-                className="w-full"
+                variant="ghost"
+                size="icon"
+                className="rounded-full bg-opacity-20 hover:bg-opacity-30"
+                style={{ backgroundColor: `${card.colors.text}20` }}
                 onClick={(e) => {
                   e.stopPropagation()
-                  onAddNew()
+                  onDelete()
                 }}
               >
-                <Plus className="mr-2 h-4 w-4" />
-                Add New Memory
+                <Trash2 className="h-4 w-4" style={{ color: card.colors.text }} />
+                <span className="sr-only">Delete</span>
               </Button>
-            ) : (
-              <>
-                <div
-                  className="rounded-full px-3 py-1 text-sm"
-                  style={{
-                    backgroundColor: `${card.colors.text}20`,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "0.25rem",
-                  }}
-                >
-                  {card.liked ? (
-                    <Heart className="h-4 w-4 fill-red-500 text-red-500" />
-                  ) : (
-                    <Heart className="h-4 w-4" />
-                  )}
-                  {card.date || "No date"}
-                </div>
-                <p className="mt-2 text-sm opacity-80">{card.description}</p>
-              </>
-            )}
-          </div>
-
-          {/* Drag indicator for the top card */}
-          {index === 0 && !isRearranging && !isAddNewCard && (
-            <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 flex-col items-center">
-              <motion.div
-                className="h-1 w-10 rounded-full"
-                style={{ backgroundColor: `${card.colors.text}40` } as any}
-                animate={{ y: [0, 5, 0] }}
-                transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5 }}
-              />
             </div>
           )}
-        </motion.div>
-      )}
+        </div>
+
+        {/* Card Title */}
+        <div className="px-4 py-2">
+          <h2 className="text-3xl font-bold">{card.title}</h2>
+          <h3 className="text-xl font-medium" style={{ color: `${card.colors.text}99` }}>
+            {card.subtitle}
+          </h3>
+        </div>
+
+        {/* Card Image */}
+        <div className="mt-2 overflow-hidden px-4">
+          <div
+            className="aspect-video w-full overflow-hidden rounded-xl bg-cover bg-center"
+            style={{
+              backgroundImage: `url(${card.imageUrl})`,
+              boxShadow: `0 10px 30px ${card.colors.shadow}`,
+            }}
+          />
+        </div>
+
+        {/* Card Footer - moved up closer to the photo */}
+        <div className="mt-2 p-4">
+          {isAddNewCard ? (
+            <Button
+              className="w-full"
+              onClick={(e) => {
+                e.stopPropagation()
+                onAddNew()
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add New Memory
+            </Button>
+          ) : (
+            <>
+              <div
+                className="rounded-full px-3 py-1 text-sm"
+                style={{
+                  backgroundColor: `${card.colors.text}20`,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                }}
+              >
+                {card.liked ? (
+                  <Heart className="h-4 w-4 fill-red-500 text-red-500" />
+                ) : (
+                  <Heart className="h-4 w-4" />
+                )}
+                {card.date || "No date"}
+              </div>
+              <p className="mt-2 text-sm opacity-80">{card.description}</p>
+            </>
+          )}
+        </div>
+      </motion.div>
     </motion.div>
   )
 }
 
 export default function CardStack() {
-  return (
-    <CardStackProvider>
-      <CardStackContent />
-    </CardStackProvider>
-  )
+  return <CardStackContent />
 }
 
