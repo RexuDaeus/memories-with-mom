@@ -19,6 +19,8 @@ interface CardData {
   subtitle: string
   description: string
   imageUrl: string
+  liked: boolean
+  date?: string
   colors: {
     primary: string
     secondary: string
@@ -36,6 +38,8 @@ const initialCards: CardData[] = [
     description: "Exploring beautiful temples together as a family, creating memories that will last a lifetime.",
     imageUrl:
       "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/IMG-20250314-WA0005.jpg-ZsjW2FUAezauEwcNt5jriCeKw2TxxH.jpeg",
+    liked: false,
+    date: "2024-03-10",
     colors: {
       primary: "#5a3a31",
       secondary: "#8c5b4a",
@@ -50,6 +54,8 @@ const initialCards: CardData[] = [
     description: "Discovering new places and experiencing the city life together.",
     imageUrl:
       "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/IMG-20250314-WA0002.jpg-Nqath6kUCDkjDbPJEFM46RdcromAEu.jpeg",
+    liked: false,
+    date: "2024-02-15",
     colors: {
       primary: "#1a3a5f",
       secondary: "#2d5f8a",
@@ -64,6 +70,8 @@ const initialCards: CardData[] = [
     description: "Enjoying the simple pleasures of good food and better company.",
     imageUrl:
       "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/IMG-20250314-WA0004.jpg-Eo5ghpMcHTmVdhrexnf8NTS5I0RX2q.jpeg",
+    liked: false,
+    date: "",
     colors: {
       primary: "#2d4a22",
       secondary: "#4a7a38",
@@ -78,6 +86,8 @@ const initialCards: CardData[] = [
     description: "Finding art and beauty in unexpected places during our travels.",
     imageUrl:
       "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/IMG-20250314-WA0006.jpg-1iAGsQwb9uCwanL6eW2pNFS7HtVQXK.jpeg",
+    liked: false,
+    date: "",
     colors: {
       primary: "#0f2b46",
       secondary: "#1e4976",
@@ -92,6 +102,8 @@ const initialCards: CardData[] = [
     description: "Experiencing the rich culture and beautiful architecture of Japan together.",
     imageUrl:
       "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/WhatsApp%20Image%202025-03-14%20at%2011.02.54_20d62ce1.jpg-Azqwejs32YQonFgASkOkbAQPC9vs8X.jpeg",
+    liked: false,
+    date: "",
     colors: {
       primary: "#8c3a31",
       secondary: "#bf5b4a",
@@ -106,6 +118,8 @@ const initialCards: CardData[] = [
     description: "Celebrating achievements and milestones with the ones who matter most.",
     imageUrl:
       "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/IMG-20250314-WA0003.jpg-tGb3JjYFFzGHpPwzDx7VMKfmrTnxE0.jpeg",
+    liked: false,
+    date: "",
     colors: {
       primary: "#1a1a1a",
       secondary: "#333333",
@@ -120,6 +134,8 @@ const initialCards: CardData[] = [
     description: "Sharing delicious meals and creating memories around the table.",
     imageUrl:
       "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/IMG-20250314-WA0007.jpg-nur8mcXQHHInwAM57iKbYrdMlSjsLU.jpeg",
+    liked: false,
+    date: "",
     colors: {
       primary: "#4a3a7a",
       secondary: "#6a5a9a",
@@ -134,6 +150,8 @@ const initialCards: CardData[] = [
     description: "Enjoying the sun, sand, and sea with the people who make life special.",
     imageUrl:
       "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/20220820_142931.jpg-4wdSp2fizrA2fyTVXAvaeyDwPrQZYR.jpeg",
+    liked: false,
+    date: "",
     colors: {
       primary: "#1a6a8a",
       secondary: "#2a8aaa",
@@ -150,6 +168,8 @@ const addNewCardTemplate: CardData = {
   subtitle: "Create a Card",
   description: "Add a new memory to celebrate Mom's special day.",
   imageUrl: "/placeholder.svg?height=400&width=600",
+  liked: false,
+  date: "",
   colors: {
     primary: "#6d28d9",
     secondary: "#8b5cf6",
@@ -221,6 +241,7 @@ function CardStackContent() {
     subtitle: "Add Your Title",
     description: "Add your description here...",
     imageUrl: "",
+    date: "",
   })
   const [draggedCardIndex, setDraggedCardIndex] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -320,6 +341,8 @@ function CardStackContent() {
       subtitle: newCardData.subtitle,
       description: newCardData.description,
       imageUrl: newCardData.imageUrl,
+      liked: false,
+      date: newCardData.date || "",
       colors,
     }
 
@@ -330,6 +353,7 @@ function CardStackContent() {
       subtitle: "Add Your Title",
       description: "Add your description here...",
       imageUrl: "",
+      date: "",
     })
 
     // Go to the newly added card
@@ -394,6 +418,14 @@ function CardStackContent() {
     setDraggedCardIndex(null)
   }
 
+  const toggleLike = (cardId: number) => {
+    setCards(prevCards => 
+      prevCards.map(card => 
+        card.id === cardId ? { ...card, liked: !card.liked } : card
+      )
+    )
+  }
+
   if (loading) {
     return <div className="flex h-96 w-full items-center justify-center">Loading cards...</div>
   }
@@ -432,6 +464,7 @@ function CardStackContent() {
               onSwipe={handleCardSwipe}
               onEdit={() => card.id !== 999 && handleEditClick(card)}
               onAddNew={handleAddNewCardClick}
+              onToggleLike={toggleLike}
               isAddNewCard={card.id === 999}
               isRearranging={isRearranging}
               onDragStart={() => handleDragStart(index)}
@@ -469,12 +502,35 @@ function CardStackContent() {
                 />
               </div>
               <div className="grid gap-2">
+                <Label htmlFor="date">Date</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={editedCard.date || ""}
+                  onChange={(e) => setEditedCard({ ...editedCard, date: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
                   value={editedCard.description}
                   onChange={(e) => setEditedCard({ ...editedCard, description: e.target.value })}
                 />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="liked">Like Status</Label>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={editedCard.liked ? "default" : "outline"}
+                    onClick={() => setEditedCard({ ...editedCard, liked: !editedCard.liked })}
+                    className={editedCard.liked ? "bg-red-500 hover:bg-red-600" : ""}
+                  >
+                    <Heart className={`mr-2 h-4 w-4 ${editedCard.liked ? "fill-white" : ""}`} />
+                    {editedCard.liked ? "Liked" : "Not Liked"}
+                  </Button>
+                </div>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="image">Image</Label>
@@ -540,6 +596,15 @@ function CardStackContent() {
               />
             </div>
             <div className="grid gap-2">
+              <Label htmlFor="new-date">Date</Label>
+              <Input
+                id="new-date"
+                type="date"
+                value={newCardData.date}
+                onChange={(e) => setNewCardData({ ...newCardData, date: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="new-description">Description</Label>
               <Textarea
                 id="new-description"
@@ -595,6 +660,7 @@ interface CardProps {
   onSwipe: (direction: number) => void
   onEdit: () => void
   onAddNew: () => void
+  onToggleLike: (cardId: number) => void
   isAddNewCard: boolean
   isRearranging: boolean
   onDragStart: () => void
@@ -610,6 +676,7 @@ function Card({
   onSwipe,
   onEdit,
   onAddNew,
+  onToggleLike,
   isAddNewCard,
   isRearranging,
   onDragStart,
@@ -674,95 +741,118 @@ function Card({
       onDragOver={isRearranging ? onDragOver : undefined}
       onDragEndCapture={isRearranging ? onDragEnd : undefined}
     >
-      <motion.div
-        className="relative flex h-full flex-col overflow-hidden rounded-2xl"
-        style={{ color: card.colors.text } as any}
-      >
-        {/* Card Header */}
-        <div className="flex items-center justify-between p-4">
-          <div className="rounded-full bg-opacity-20 p-2" style={{ backgroundColor: `${card.colors.text}20` }}>
-            <Heart className="h-5 w-5" />
-          </div>
-          {!isAddNewCard && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full bg-opacity-20 hover:bg-opacity-30"
+      {isRearranging ? (
+        // In rearrange mode, only show the photo
+        <div 
+          className="w-full h-full bg-cover bg-center rounded-2xl"
+          style={{ backgroundImage: `url(${card.imageUrl})` }}
+        />
+      ) : (
+        <motion.div
+          className="relative flex h-full flex-col overflow-hidden rounded-2xl"
+          style={{ color: card.colors.text } as any}
+        >
+          {/* Card Header */}
+          <div className="flex items-center justify-between p-4">
+            <button 
+              className="rounded-full bg-opacity-20 p-2" 
               style={{ backgroundColor: `${card.colors.text}20` }}
               onClick={(e) => {
-                e.stopPropagation()
-                onEdit()
+                e.stopPropagation();
+                onToggleLike(card.id);
               }}
             >
-              <Edit className="h-4 w-4" style={{ color: card.colors.text }} />
-              <span className="sr-only">Edit</span>
-            </Button>
-          )}
-        </div>
-
-        {/* Card Title */}
-        <div className="px-4 py-2">
-          <h2 className="text-3xl font-bold">{card.title}</h2>
-          <h3 className="text-xl font-medium" style={{ color: `${card.colors.text}99` }}>
-            {card.subtitle}
-          </h3>
-        </div>
-
-        {/* Card Image */}
-        <div className="mt-2 overflow-hidden px-4">
-          <div
-            className="aspect-video w-full overflow-hidden rounded-xl bg-cover bg-center"
-            style={{
-              backgroundImage: `url(${card.imageUrl})`,
-              boxShadow: `0 10px 30px ${card.colors.shadow}`,
-            }}
-          />
-        </div>
-
-        {/* Card Footer */}
-        <div className="mt-auto p-4">
-          {isAddNewCard ? (
-            <Button
-              className="w-full"
-              onClick={(e) => {
-                e.stopPropagation()
-                onAddNew()
-              }}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add New Memory
-            </Button>
-          ) : (
-            <>
-              <div
-                className="rounded-full px-3 py-1 text-sm"
-                style={{
-                  backgroundColor: `${card.colors.text}20`,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.25rem",
+              {card.liked ? (
+                <Heart className="h-5 w-5 fill-red-500 text-red-500" />
+              ) : (
+                <Heart className="h-5 w-5" />
+              )}
+            </button>
+            {!isAddNewCard && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full bg-opacity-20 hover:bg-opacity-30"
+                style={{ backgroundColor: `${card.colors.text}20` }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onEdit()
                 }}
               >
-                <Heart className="h-4 w-4" />
-                {card.subtitle}
-              </div>
-              <p className="mt-3 text-sm opacity-80">{card.description}</p>
-            </>
-          )}
-        </div>
+                <Edit className="h-4 w-4" style={{ color: card.colors.text }} />
+                <span className="sr-only">Edit</span>
+              </Button>
+            )}
+          </div>
 
-        {/* Drag indicator for the top card */}
-        {index === 0 && !isRearranging && !isAddNewCard && (
-          <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 flex-col items-center">
-            <motion.div
-              className="h-1 w-10 rounded-full"
-              style={{ backgroundColor: `${card.colors.text}40` } as any}
-              animate={{ y: [0, 5, 0] }}
-              transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5 }}
+          {/* Card Title */}
+          <div className="px-4 py-2">
+            <h2 className="text-3xl font-bold">{card.title}</h2>
+            <h3 className="text-xl font-medium" style={{ color: `${card.colors.text}99` }}>
+              {card.subtitle}
+            </h3>
+          </div>
+
+          {/* Card Image */}
+          <div className="mt-2 overflow-hidden px-4">
+            <div
+              className="aspect-video w-full overflow-hidden rounded-xl bg-cover bg-center"
+              style={{
+                backgroundImage: `url(${card.imageUrl})`,
+                boxShadow: `0 10px 30px ${card.colors.shadow}`,
+              }}
             />
           </div>
-        )}
-      </motion.div>
+
+          {/* Card Footer - moved up closer to the photo */}
+          <div className="mt-2 p-4">
+            {isAddNewCard ? (
+              <Button
+                className="w-full"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onAddNew()
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add New Memory
+              </Button>
+            ) : (
+              <>
+                <div
+                  className="rounded-full px-3 py-1 text-sm"
+                  style={{
+                    backgroundColor: `${card.colors.text}20`,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.25rem",
+                  }}
+                >
+                  {card.liked ? (
+                    <Heart className="h-4 w-4 fill-red-500 text-red-500" />
+                  ) : (
+                    <Heart className="h-4 w-4" />
+                  )}
+                  {card.date || "No date"}
+                </div>
+                <p className="mt-2 text-sm opacity-80">{card.description}</p>
+              </>
+            )}
+          </div>
+
+          {/* Drag indicator for the top card */}
+          {index === 0 && !isRearranging && !isAddNewCard && (
+            <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 flex-col items-center">
+              <motion.div
+                className="h-1 w-10 rounded-full"
+                style={{ backgroundColor: `${card.colors.text}40` } as any}
+                animate={{ y: [0, 5, 0] }}
+                transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5 }}
+              />
+            </div>
+          )}
+        </motion.div>
+      )}
     </motion.div>
   )
 }

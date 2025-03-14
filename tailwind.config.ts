@@ -12,6 +12,22 @@ const config: Config = {
   		fontFamily: {
   			cursive: ['var(--font-dancing-script)'],
   		},
+      height: {
+        '70': '18rem',
+        '75': '19rem',
+        '90': '22rem',
+        '100': '25rem',
+        '110': '28rem',
+        '120': '30rem',
+      },
+      width: {
+        '70': '18rem',
+        '75': '19rem',
+        '90': '22rem',
+        '100': '25rem',
+        '110': '28rem',
+        '120': '30rem',
+      },
   		colors: {
   			border: "hsl(var(--border))",
   			input: "hsl(var(--input))",
@@ -60,15 +76,15 @@ const config: Config = {
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		animation: {
-  			"float-slow": "float 8s ease-in-out infinite",
-  			"float-medium": "float 6s ease-in-out infinite",
-  			"float-fast": "float 4s ease-in-out infinite",
-  			"pulse": "pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+  			"float-slow": "float 5s ease-in-out infinite",
+  			"float-medium": "float 4s ease-in-out infinite",
+  			"float-fast": "float 3s ease-in-out infinite",
+  			"pulse": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
   		},
   		keyframes: {
   			float: {
   				"0%, 100%": { transform: "translateY(0) scale(1)" },
-  				"50%": { transform: "translateY(-20px) scale(1.05)" },
+  				"50%": { transform: "translateY(-30px) scale(1.05)" },
   			},
   			pulse: {
   				"0%, 100%": { opacity: "0.7" },

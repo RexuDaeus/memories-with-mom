@@ -177,39 +177,42 @@ export default function AudioPlayer() {
           </Button>
           
           {showVolumeSlider && (
-            <div className="absolute -top-24 -left-12 bg-white dark:bg-slate-800 p-3 rounded-lg shadow-md">
-              <div className="w-32 flex flex-col gap-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-slate-600 dark:text-slate-300">Volume: {volume}%</span>
-                  {volume > 0 ? (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={() => setVolume(0)}
-                      title="Mute"
-                    >
-                      <VolumeX className="h-3 w-3" />
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={() => setVolume(40)}
-                      title="Unmute"
-                    >
-                      <Volume2 className="h-3 w-3" />
-                    </Button>
-                  )}
+            <div className="absolute bottom-8 -left-1 bg-white dark:bg-slate-800 p-3 rounded-lg shadow-md">
+              <div className="h-32 flex flex-col gap-2 items-center">
+                <span className="text-xs text-slate-600 dark:text-slate-300">
+                  {volume}%
+                </span>
+                <div className="h-24 py-1">
+                  <Slider
+                    orientation="vertical"
+                    value={[volume]}
+                    min={0}
+                    max={100}
+                    step={1}
+                    onValueChange={handleVolumeChange}
+                  />
                 </div>
-                <Slider
-                  value={[volume]}
-                  min={0}
-                  max={100}
-                  step={1}
-                  onValueChange={handleVolumeChange}
-                />
+                {volume > 0 ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => setVolume(0)}
+                    title="Mute"
+                  >
+                    <VolumeX className="h-3 w-3" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => setVolume(40)}
+                    title="Unmute"
+                  >
+                    <Volume2 className="h-3 w-3" />
+                  </Button>
+                )}
               </div>
             </div>
           )}
